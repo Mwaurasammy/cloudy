@@ -8,6 +8,11 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")  # Add a default for development if needed
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")  # PostgreSQL connection string
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_size": 5,
+        "pool_recycle": 1800
+    }
 
     # Supabase configuration
     SUPABASE_URL = os.getenv('SUPABASE_URL')
