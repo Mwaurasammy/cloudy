@@ -1,8 +1,8 @@
 from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
-from .config import Config
-from .models import db
+from config import Config
+from models import db
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -13,9 +13,9 @@ jwt = JWTManager(app)
 migrate = Migrate(app, db)
 
 # Import and register blueprints here
-from .resources.auth import auth_bp 
-from .resources.folder import folder_bp
-from .resources.file import file_bp
+from resources.auth import auth_bp 
+from resources.folder import folder_bp
+from resources.file import file_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(folder_bp, url_prefix='/api/folders')
