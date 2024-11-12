@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Folder
@@ -19,9 +20,15 @@ def create_folder():
 def list_folders():
     user_id = get_jwt_identity()
     folders = Folder.query.filter_by(user_id=user_id).all()
-    folder_data = [folder.to_dict() for folder in folders]  # Use the `to_dict()` method here
+    
+    # Update last_accessed for each accessed folder
+    for folder in folders:
+        folder.last_accessed = datetime.utcnow()
+    
+    db.session.commit()
+    
+    folder_data = [folder.to_dict() for folder in folders]
     return jsonify(folders=folder_data), 200
-
 
 @folder_bp.route('/<int:folder_id>', methods=['PUT'])
 @jwt_required()
@@ -29,7 +36,6 @@ def update_folder(folder_id):
     user_id = get_jwt_identity()
     data = request.get_json()
 
-    # Retrieve the folder by ID and check ownership
     folder = Folder.query.filter_by(id=folder_id, user_id=user_id).first()
     if not folder:
         return jsonify(error="Folder not found or access denied"), 404
@@ -38,9 +44,11 @@ def update_folder(folder_id):
     if 'name' in data:
         folder.name = data['name']
 
+    # Update last_accessed on update
+    folder.last_accessed = datetime.utcnow()
+
     db.session.commit()
     return jsonify(message="Folder updated", folder_id=folder.id, name=folder.name), 200
-
 
 @folder_bp.route('/<int:folder_id>', methods=['DELETE'])
 @jwt_required()
@@ -49,5 +57,19 @@ def delete_folder(folder_id):
     if folder:
         db.session.delete(folder)
         db.session.commit()
-        return jsonify(message="Folder delete"), 200
-    return jsonify(error="folder deleted"), 404
+        return jsonify(message="Folder deleted"), 200
+    return jsonify(error="Folder not found"), 404
+
+
+@folder_bp.route('/recent', methods=['GET'])
+@jwt_required()
+def get_recent_folders():
+    user_id = get_jwt_identity()
+    
+    # Retrieve folders belonging to the user, sorted by last_accessed in descending order
+    recent_folders = Folder.query.filter_by(user_id=user_id).order_by(Folder.last_accessed.desc()).limit(10).all()
+    
+    # Serialize folder data
+    folder_data = [folder.to_dict() for folder in recent_folders]
+    
+    return jsonify(folders=folder_data), 200
