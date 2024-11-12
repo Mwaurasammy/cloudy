@@ -95,12 +95,13 @@ def get_file(file_id):
 @file_bp.route('/<int:file_id>', methods=['DELETE'])
 @jwt_required()
 def delete_file(file_id):
-    file = File.query.get(file_id)
+    user_id = get_jwt_identity()
+    file = File.query.filter_by(id=file_id, user_id=user_id, deleted_at=None).first()
     if file:
-        db.session.delete(file)
+        file.deleted_at = datetime.utcnow()  # Mark as deleted by setting deleted_at
         db.session.commit()
-        return jsonify(message="File deleted"), 200
-    return jsonify(error="File not found"), 404
+        return jsonify(message="Folder moved to trash"), 200
+    return jsonify(error="Folder not found or access denied"), 404
 
 
 

@@ -16,10 +16,12 @@ migrate = Migrate(app, db)
 from resources.auth import auth_bp 
 from resources.folder import folder_bp
 from resources.file import file_bp
+from resources.trash import trash_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(folder_bp, url_prefix='/api/folders')
 app.register_blueprint(file_bp, url_prefix='/api/files')
+app.register_blueprint(trash_bp, url_prefix='/api/trash')
 
 # Database initialization
 with app.app_context():

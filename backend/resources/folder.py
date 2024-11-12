@@ -53,12 +53,13 @@ def update_folder(folder_id):
 @folder_bp.route('/<int:folder_id>', methods=['DELETE'])
 @jwt_required()
 def delete_folder(folder_id):
-    folder = Folder.query.get(folder_id)
+    user_id = get_jwt_identity()
+    folder = Folder.query.filter_by(id=folder_id, user_id=user_id, deleted_at=None).first()
     if folder:
-        db.session.delete(folder)
+        folder.deleted_at = datetime.utcnow()  # Mark as deleted by setting deleted_at
         db.session.commit()
-        return jsonify(message="Folder deleted"), 200
-    return jsonify(error="Folder not found"), 404
+        return jsonify(message="Folder moved to trash"), 200
+    return jsonify(error="Folder not found or access denied"), 404
 
 
 @folder_bp.route('/recent', methods=['GET'])

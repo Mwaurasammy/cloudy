@@ -26,18 +26,17 @@ class Folder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    last_accessed = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     files = db.relationship('File', back_populates='folder')
-
+    last_accessed = db.Column(db.DateTime, default=datetime.utcnow)
+    deleted_at = db.Column(db.DateTime, nullable=True)  # New field to track deletion timestamp
 
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
-            'files': [file.to_dict() for file in self.files],  # Include associated files
-            'last_accessed': self.last_accessed.isoformat() if self.last_accessed else None
+            'last_accessed': self.last_accessed.isoformat(),
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
         }
-
 
 class File(db.Model):
     __tablename__ = 'files'
@@ -45,15 +44,14 @@ class File(db.Model):
     name = db.Column(db.String(120), nullable=False)
     content = db.Column(db.LargeBinary, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    last_accessed = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     folder_id = db.Column(db.Integer, db.ForeignKey('folders.id'), nullable=False)
     folder = db.relationship('Folder', back_populates='files')
-
+    deleted_at = db.Column(db.DateTime, nullable=True)  # New field to track deletion timestamp
 
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
             'created_at': self.created_at.isoformat(),
-            'last_accessed': self.last_accessed.isoformat() if self.last_accessed else None
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
         }
