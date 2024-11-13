@@ -29,7 +29,7 @@ Flask-DotEnv==0.1.2
 Flask-JWT-Extended==4.6.0
 Flask-Migrate==4.0.7
 Flask-RESTful==0.3.10
-Flask-SQLAlchemy==3.1.1
+Flask-SQLAlchemy
 frozenlist==1.5.0
 fsspec==2024.9.0
 gotrue==2.10.0
@@ -96,8 +96,8 @@ spacy==3.7.6
 spacy-legacy==3.0.12
 spacy-loggers==1.0.5
 SpeechRecognition==3.10.4
-SQLAlchemy==2.0.36
-sqlalchemy-serializer==1.4.22
+SQLAlchemy>=2.0
+sqlalchemy-serializer
 srsly==2.4.8
 storage3==0.9.0
 supabase==2.10.0
