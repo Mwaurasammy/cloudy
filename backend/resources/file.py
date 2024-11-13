@@ -1,147 +1,127 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, File, Folder  # Assuming Folder model is imported
-import base64
+from models import db, File, Folder
 from datetime import datetime
-
+from supabase_client import (
+    upload_file_to_storage,
+    delete_file_from_storage,
+    rename_file_in_storage,
+    move_folder_to_folder,
+    view_file_info as get_file_info_from_storage
+)
 
 file_bp = Blueprint('file', __name__)
 
-
+# 1. Upload a file (No folder ID required)
 @file_bp.route('/upload', methods=['POST'])
 @jwt_required()
 def upload_file():
-    data = request.get_json()
+    if 'file' not in request.files or 'name' not in request.form:
+        return jsonify(error="Missing file or name"), 400
 
-
-    if 'folder_id' not in data or 'content' not in data or 'name' not in data:
-        return jsonify(error="Missing folder_id, content, or name"), 400
-
-
-    folder_id = data['folder_id']
-    content = data['content']
-    name = data['name']
-
+    file = request.files['file']
+    name = request.form['name']
 
     user_id = get_jwt_identity()
-    folder = Folder.query.filter_by(id=folder_id, user_id=user_id).first()
+    file_content = file.read()
 
+    try:
+        # Upload the file directly to Supabase storage (without folder)
+        file_metadata = upload_file_to_storage(name, file_content)
+        if not file_metadata:
+            return jsonify(error="Failed to upload file to Supabase Storage"), 500
+    except Exception as e:
+        return jsonify(error="Failed to upload file to storage", details=str(e)), 500
 
-    if not folder:
-        return jsonify(error="Folder not found or doesn't belong to the current user"), 404
+    return jsonify(message="File uploaded successfully", file=file_metadata), 201
 
-
-    file_content = content.encode()
-    file = File(name=name, content=file_content, folder_id=folder_id)
-
-
-    db.session.add(file)
-    db.session.commit()
-
-
-    return jsonify(message="File uploaded", file_id=file.id), 201
-
-
-
-
-@file_bp.route('/list', methods=['GET'])
+# 2. Update file name
+@file_bp.route('/update_name/<int:file_id>', methods=['PUT'])
 @jwt_required()
-def list_files():
+def update_file_name(file_id):
     user_id = get_jwt_identity()
-    folder_id = request.args.get('folder_id')
-    sort_by_recent = request.args.get('recent', 'false').lower() == 'true'
-
-
-    if folder_id:
-        files_query = File.query.join(Folder).filter(Folder.user_id == user_id, File.folder_id == folder_id)
-    else:
-        files_query = File.query.join(Folder).filter(Folder.user_id == user_id)
-
-
-    if sort_by_recent:
-        files_query = files_query.order_by(File.last_accessed.desc())
-
-
-    files = files_query.all()
-    file_data = [{"id": f.id, "name": f.name, "folder_id": f.folder_id, "last_accessed": f.last_accessed.isoformat()} for f in files]
-
-
-    return jsonify(files=file_data), 200
-
-
-
-
-@file_bp.route('/get/<int:file_id>', methods=['GET'])
-@jwt_required()
-def get_file(file_id):
-    user_id = get_jwt_identity()
-    file = File.query.join(Folder).filter(File.id == file_id, Folder.user_id == user_id).first()
-
+    file = File.query.filter_by(id=file_id, user_id=user_id).first()
 
     if not file:
-        return jsonify(error="File not found or doesn't belong to the current user"), 404
+        return jsonify({"error": "File not found"}), 404
 
+    if 'new_name' not in request.form:
+        return jsonify({"error": "New file name is required"}), 400
 
-    # Update last accessed timestamp
-    file.last_accessed = datetime.utcnow()
+    new_name = request.form['new_name']
+
+    try:
+        rename_file_in_storage(file.name, new_name)
+    except Exception as e:
+        return jsonify(error="Failed to rename file in storage", details=str(e)), 500
+
+    file.name = new_name
     db.session.commit()
 
+    return jsonify({"message": "File name updated successfully", "file_id": file.id, "new_name": file.name}), 200
 
-    return jsonify(file.to_dict()), 200
-
-
-
-
+# 3. Delete file (soft delete)
 @file_bp.route('/<int:file_id>', methods=['DELETE'])
 @jwt_required()
 def delete_file(file_id):
     user_id = get_jwt_identity()
     file = File.query.filter_by(id=file_id, user_id=user_id, deleted_at=None).first()
-    if file:
-        file.deleted_at = datetime.utcnow()  # Mark as deleted by setting deleted_at
-        db.session.commit()
-        return jsonify(message="Folder moved to trash"), 200
-    return jsonify(error="Folder not found or access denied"), 404
 
+    if not file:
+        return jsonify(error="File not found or access denied"), 404
 
+    file.deleted_at = datetime.utcnow()
+    db.session.commit()
 
+    try:
+        delete_file_from_storage(file.name)
+    except Exception as e:
+        return jsonify(error="Failed to delete file from storage", details=str(e)), 500
 
-@file_bp.route('/update_name/<int:file_id>', methods=['PUT'])
+    return jsonify(message="File moved to trash"), 200
+
+# 4. Move file into another folder
+@file_bp.route('/move/<int:file_id>', methods=['PUT'])
 @jwt_required()
-def update_file_name(file_id):
+def move_file(file_id):
     user_id = get_jwt_identity()
-    file = File.query.filter_by(id=file_id).first()
-
+    file = File.query.filter_by(id=file_id, user_id=user_id).first()
 
     if not file:
         return jsonify({"error": "File not found"}), 404
 
+    if 'new_folder_id' not in request.form:
+        return jsonify({"error": "New folder ID is required"}), 400
 
-    folder = file.folder
-    if folder.user_id != user_id:
-        return jsonify({"error": "You do not have permission to update this file"}), 403
+    new_folder_id = request.form['new_folder_id']
+    new_folder = Folder.query.filter_by(id=new_folder_id, user_id=user_id).first()
 
+    if not new_folder:
+        return jsonify({"error": "New folder not found"}), 404
 
-    data = request.get_json()
-    new_name = data.get("new_name")
+    try:
+        move_folder_to_folder(file.name, new_folder.name)  # Updated function call
+    except Exception as e:
+        return jsonify(error="Failed to move file in storage", details=str(e)), 500
 
-
-    if not new_name:
-        return jsonify({"error": "New file name is required"}), 400
-
-
-    file.name = new_name
+    file.folder_id = new_folder_id
     db.session.commit()
 
+    return jsonify(message="File moved successfully"), 200
 
-    return jsonify({"message": "File name updated successfully", "file_id": file.id, "new_name": file.name}), 200
+# 5. View file info
+@file_bp.route('/<int:file_id>/info', methods=['GET'])
+@jwt_required()
+def view_file_info(file_id):
+    user_id = get_jwt_identity()
+    file = File.query.filter_by(id=file_id, user_id=user_id).first()
 
+    if not file:
+        return jsonify({"error": "File not found"}), 404
 
+    try:
+        file_info = get_file_info_from_storage(file.name)
+    except Exception as e:
+        return jsonify(error="Failed to retrieve file info from storage", details=str(e)), 500
 
-
-#To list recent files:
-# GET /list?recent=true
-
-
-#To retrieve and update the access timestamp of a specific file:
-# GET /get/<file_id>
+    return jsonify(file_info=file_info), 200
