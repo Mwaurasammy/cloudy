@@ -22,12 +22,15 @@ from resources.folder import folder_bp
 from resources.file import file_bp
 from resources.trash import trash_bp
 from resources.recents import recents_bp
+from resources.uploads import upload_bp
+
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(folder_bp, url_prefix='/api/folders')
 app.register_blueprint(file_bp, url_prefix='/api/files')
 app.register_blueprint(trash_bp, url_prefix='/api/trash')
 app.register_blueprint(recents_bp, url_prefix='/api/recents')
+app.register_blueprint(upload_bp, url_prefix='/upload')
 
 # Database initialization
 with app.app_context():

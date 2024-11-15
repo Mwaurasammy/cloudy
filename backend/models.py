@@ -58,3 +58,23 @@ class File(db.Model):
             'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
             'folder_id': self.folder_id,  # Include folder_id for clarity in the output
         }
+
+class Upload(db.Model):
+    __tablename__ = 'uploads'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    file_name = db.Column(db.String(255), nullable=False)  # Ensures file_name is always provided
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Links to User model
+    upload_time = db.Column(db.DateTime, default=datetime.utcnow)  # Defaults to current timestamp
+
+    # Relationship to the User model
+    user = db.relationship('User', backref=db.backref('uploads', lazy=True))
+
+    def to_dict(self):
+        """Convert the Upload object to a dictionary format for JSON serialization."""
+        return {
+            'id': self.id,
+            'file_name': self.file_name,
+            'user_id': self.user_id,
+            'upload_time': self.upload_time.isoformat(),
+        }
