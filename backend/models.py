@@ -64,6 +64,7 @@ class Upload(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     file_name = db.Column(db.String(255), nullable=False)  # Ensures file_name is always provided
+    file_path = db.Column(db.String(255), nullable=False)  # Path in the Sup
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Links to User model
     upload_time = db.Column(db.DateTime, default=datetime.utcnow)  # Defaults to current timestamp
 
@@ -76,5 +77,6 @@ class Upload(db.Model):
             'id': self.id,
             'file_name': self.file_name,
             'user_id': self.user_id,
+            'file_path': self.file_path,
             'upload_time': self.upload_time.isoformat(),
         }

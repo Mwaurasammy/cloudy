@@ -1,26 +1,32 @@
 from flask import Blueprint, request, jsonify
 from models import db, Upload
-from utils import get_presigned_url
+from utils import upload_file
+from config import Config
 
 # Create a Blueprint for upload-related routes
 upload_bp = Blueprint('upload_bp', __name__)
 
-# Route to generate a presigned URL for uploading a file
-@upload_bp.route('/get_presigned_url', methods=['POST'])
-def generate_presigned_url():
-    data = request.json
-    file_name = data.get('file_name')
-    if not file_name:
-        return jsonify({"error": "File name is required"}), 400
+@upload_bp.route('/upload_file', methods=['POST'])
+def upload_file_route():
+    data = request.files
+    file = data.get('file')  # Fetch the file from the form data
+    
+    # Check if the file exists in the request
+    if not file:
+        return jsonify({"error": "File is required"}), 400
 
-    print(f"Received file name: {file_name}")  # Log to check if request is coming through
+    # If the file exists, proceed with creating the file path
+    file_path = f"user_uploads/{file.filename}"
 
-    # Generate a presigned URL using a helper function (e.g., from Supabase or S3)
-    presigned_url = get_presigned_url(file_name)
-    if not presigned_url:
-        return jsonify({"error": "Failed to generate presigned URL"}), 500
+    # Read file content
+    file_content = file.read()
 
-    return jsonify({"url": presigned_url, "file_name": file_name})
+    # Upload to Supabase
+    upload_response = upload_file(Config.SUPABASE_BUCKET, file_path, file_content)
+    if not upload_response:
+        return jsonify({"error": "Failed to upload file"}), 500
+
+    return jsonify(upload_response)
 
 # Route to save file metadata to the database
 @upload_bp.route('/save_metadata', methods=['POST'])
@@ -53,6 +59,3 @@ def add_cors_headers(response):
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
     return response
-
-#/upload/get_presigned_url
-#/upload/save_metadata

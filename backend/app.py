@@ -30,7 +30,7 @@ app.register_blueprint(folder_bp, url_prefix='/api/folders')
 app.register_blueprint(file_bp, url_prefix='/api/files')
 app.register_blueprint(trash_bp, url_prefix='/api/trash')
 app.register_blueprint(recents_bp, url_prefix='/api/recents')
-app.register_blueprint(upload_bp, url_prefix='/upload')
+app.register_blueprint(upload_bp, url_prefix='/api/upload/upload_file')
 
 # Database initialization
 with app.app_context():
