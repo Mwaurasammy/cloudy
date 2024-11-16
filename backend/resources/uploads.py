@@ -44,6 +44,14 @@ def save_metadata():
         db.session.rollback()
         return jsonify({"error": f"Failed to save metadata: {str(e)}"}), 500
 
+@upload_bp.after_request
+def add_cors_headers(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
+
+
 #/upload/get_presigned_url
 #/upload/save_metadata
 #
