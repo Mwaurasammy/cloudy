@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from models import db, Upload
-from utils import upload_file
+# from utils import upload_file
 from config import Config
+from supabase_client import upload_file_to_storage 
 
 # Create a Blueprint for upload-related routes
 upload_bp = Blueprint('upload_bp', __name__)
@@ -16,17 +17,18 @@ def upload_file_route():
         return jsonify({"error": "File is required"}), 400
 
     # If the file exists, proceed with creating the file path
-    file_path = f"user_uploads/{file.filename}"
-
-    # Read file content
+    file_name = file.filename
     file_content = file.read()
 
     # Upload to Supabase
-    upload_response = upload_file(Config.SUPABASE_BUCKET, file_path, file_content)
+    upload_response = upload_file_to_storage(file_name, file_content)  # Call the function from supabaseclient.py
+
     if not upload_response:
         return jsonify({"error": "Failed to upload file"}), 500
 
-    return jsonify(upload_response)
+    # Optionally, save metadata to the database here if needed (you already have a save_metadata route for that)
+    file_metadata = upload_response
+    return jsonify(file_metadata), 200  # Return file metadata on success
 
 # Route to save file metadata to the database
 @upload_bp.route('/save_metadata', methods=['POST'])

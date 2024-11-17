@@ -20,11 +20,11 @@ def upload_file(bucket_name, file_path, file_content):
     try:
         from supabase import create_client, Client
         supabase_url = Config.SUPABASE_URL
-        supabase_key = Config.SUPABASE_API_KEY
+        supabase_key = Config.SUPABASE_KEY
         supabase: Client = create_client(supabase_url, supabase_key)
 
         # Upload the file
-        response = supabase.storage.from_(Config.SUPABASE_BUCKET).upload(file_path, file_content)
+        response = supabase.storage.from_(bucket_name).upload(file_path, file_content)
         if response.status_code == 200:
             return response.data  # or whatever response data structure you're using
         else:
