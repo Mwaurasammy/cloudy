@@ -8,7 +8,8 @@ from flask_cors import CORS
 
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "https://your-frontend.com"}})
+
 app.config.from_object(Config)
 db.init_app(app)
 jwt = JWTManager(app)
