@@ -11,6 +11,7 @@ class User(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     folders = db.relationship('Folder', backref='user', lazy=True)
+    files = db.relationship('File', back_populates='user')  # Relationship to File
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -40,13 +41,16 @@ class File(db.Model):
     __tablename__ = 'files'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    storage_path = db.Column(db.String(255), nullable=False)  # Path in the Supabase bucket
-    folder_id = db.Column(db.Integer, db.ForeignKey('folders.id'), nullable=True)  # Link to folder
+    storage_path = db.Column(db.String(255), nullable=False)
+    folder_id = db.Column(db.Integer, db.ForeignKey('folders.id'), nullable=True)  # Optional for direct user files
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Direct link to User
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_accessed = db.Column(db.DateTime, default=datetime.utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)
 
+    # Relationships
     folder = db.relationship('Folder', back_populates='files')  # Back-reference to folder
+    user = db.relationship('User', back_populates='files')  # Back-reference to User
 
     def to_dict(self):
         return {
@@ -56,8 +60,10 @@ class File(db.Model):
             'created_at': self.created_at.isoformat(),
             'last_accessed': self.last_accessed.isoformat(),
             'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
-            'folder_id': self.folder_id,  # Include folder_id for clarity in the output
+            'folder_id': self.folder_id,
+            'user_id': self.user_id,
         }
+
 
 class Upload(db.Model):
     __tablename__ = 'uploads'
