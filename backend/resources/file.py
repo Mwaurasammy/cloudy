@@ -125,3 +125,17 @@ def view_file_info(file_id):
         return jsonify(error="Failed to retrieve file info from storage", details=str(e)), 500
 
     return jsonify(file_info=file_info), 200
+
+# 6. Get all files
+@file_bp.route('/all', methods=['GET'])
+@jwt_required()
+def get_all_files():
+    user_id = get_jwt_identity()
+
+    # Retrieve all files belonging to the logged-in user
+    files = File.query.filter_by(user_id=user_id, deleted_at=None).all()
+
+    # Convert file objects to dictionaries
+    file_list = [file.to_dict() for file in files]
+
+    return jsonify(files=file_list), 200
