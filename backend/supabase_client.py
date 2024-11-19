@@ -1,6 +1,7 @@
 import os
 import logging
 import traceback
+import mimetypes
 from supabase import create_client
 from config import Config
 from models import db, File
@@ -15,14 +16,41 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+# Allowed MIME types for uploads
+ALLOWED_MIME_TYPES = [
+    'image/jpeg',
+    'image/png',
+    'image/jpg',
+    'image/gif',
+    'image/svg+xml',
+    'application/pdf',
+    'text/plain',
+    'application/zip'
+]
+
 # --- File and Folder Operations ---
 
+# 1. Upload a file to Supabase storage
 def upload_file_to_storage(file_name, file_content):
     try:
-        # Access the storage directly from the supabase client
+        # Validate MIME type
+        mime_type, _ = mimetypes.guess_type(file_name)
+        if mime_type not in ALLOWED_MIME_TYPES:
+            logging.error(f"File {file_name} has an invalid MIME type: {mime_type}")
+            return {"error": "Invalid file type. Upload a valid file."}, 400
+        
+        # Access the storage directly from the Supabase client
         storage = supabase.storage
         file_path = os.path.join('files', file_name)  # Save the file under 'files/' in your bucket
-        response = storage.from_(bucket_name).upload(file_path, file_content)
+        
+        # Check for duplicate files using 'list' method
+        file_list = storage.from_(bucket_name).list('files', {'prefix': file_name})
+        if file_list and any(f['name'] == file_name for f in file_list):
+            logging.warning(f"File {file_name} already exists.")
+            return {"error": "File with the same name already exists"}, 409
+
+        # Upload the file
+        response = storage.from_(bucket_name).upload(file_path, file_content, {"content-type": mime_type})
 
         # Check if the response has an error attribute or the upload failed
         if hasattr(response, 'error') and response.error:
@@ -45,11 +73,10 @@ def upload_file_to_storage(file_name, file_content):
         logging.error(traceback.format_exc())
         return None
 
-
 # 2. Upload a folder to Supabase storage
 def upload_folder_to_storage(folder_name, folder_path):
     try:
-        storage = supabase.storage()
+        storage = supabase.storage
         for root, _, files in os.walk(folder_path):
             for file in files:
                 file_path = os.path.join(root, file)
@@ -70,7 +97,7 @@ def upload_folder_to_storage(folder_name, folder_path):
 # 3. Delete a file from Supabase storage
 def delete_file_from_storage(file_name):
     try:
-        storage = supabase.storage()
+        storage = supabase.storage
         file_path = os.path.join('files', file_name)
         response = storage.from_(bucket_name).remove([file_path])
         if response.get('error'):
@@ -86,7 +113,7 @@ def delete_file_from_storage(file_name):
 # 4. Delete a folder and its contents from Supabase storage
 def delete_folder_from_storage(folder_name):
     try:
-        storage = supabase.storage()
+        storage = supabase.storage
         folder_path = os.path.join('folders', folder_name, '')
         files = storage.from_(bucket_name).list(folder_path)
         if not files or 'error' in files:
@@ -105,7 +132,7 @@ def delete_folder_from_storage(folder_name):
 # 5. Rename a file in Supabase storage
 def rename_file_in_storage(old_name, new_name):
     try:
-        storage = supabase.storage()
+        storage = supabase.storage
         old_path = os.path.join('files', old_name)
         new_path = os.path.join('files', new_name)
         response = storage.from_(bucket_name).move(old_path, new_path)
@@ -122,7 +149,7 @@ def rename_file_in_storage(old_name, new_name):
 # 6. Rename a folder in Supabase storage
 def rename_folder_in_storage(old_folder_name, new_folder_name):
     try:
-        storage = supabase.storage()
+        storage = supabase.storage
         old_folder_path = os.path.join('folders', old_folder_name, '')
         files = storage.from_(bucket_name).list(old_folder_path)
 
@@ -140,7 +167,7 @@ def rename_folder_in_storage(old_folder_name, new_folder_name):
 # 7. Move a folder to another folder in Supabase storage
 def move_folder_to_folder(folder_name, target_folder_name):
     try:
-        storage = supabase.storage()
+        storage = supabase.storage
         folder_path = os.path.join('folders', folder_name, '')
         files = storage.from_(bucket_name).list(folder_path)
         if not files or 'error' in files:
@@ -164,7 +191,7 @@ def move_folder_to_folder(folder_name, target_folder_name):
 # 8. View file information (metadata)
 def view_file_info(file_name):
     try:
-        storage = supabase.storage()
+        storage = supabase.storage
         file_path = os.path.join('files', file_name)
         file_info = storage.from_(bucket_name).get_metadata(file_path)
         if file_info.get('error'):
@@ -178,7 +205,7 @@ def view_file_info(file_name):
 # 9. View folder information (metadata)
 def view_folder_info(folder_name):
     try:
-        storage = supabase.storage()
+        storage = supabase.storage
         folder_path = os.path.join('folders', folder_name, '')
         files = storage.from_(bucket_name).list(folder_path)
         if not files or 'error' in files:
@@ -189,3 +216,4 @@ def view_folder_info(folder_name):
         logging.error(f"Error fetching folder info: {e}")
         logging.error(traceback.format_exc())
         return str(e)
+
