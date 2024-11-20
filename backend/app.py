@@ -23,6 +23,7 @@ from resources.file import file_bp
 from resources.trash import trash_bp
 from resources.recents import recents_bp
 from resources.uploads import upload_bp
+from resources.fetch_files import all_files_bp
 
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -31,6 +32,7 @@ app.register_blueprint(file_bp, url_prefix='/api/files')
 app.register_blueprint(trash_bp, url_prefix='/api/trash')
 app.register_blueprint(recents_bp, url_prefix='/api/recents')
 app.register_blueprint(upload_bp, url_prefix='/api/upload')
+app.register_blueprint(all_files_bp, url_prefix='/api/all_files')
 
 # Database initialization
 with app.app_context():
