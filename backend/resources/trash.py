@@ -67,6 +67,18 @@ def cleanup_old_trashed_items():
     db.session.commit()
     return jsonify(message="Old trashed items permanently deleted"), 200
 
+@trash_bp.route('/folder/<int:folder_id>', methods=['DELETE'])
+@jwt_required()
+def delete_folder_permanently(folder_id):
+    user_id = get_jwt_identity()
+    folder = Folder.query.filter_by(id=folder_id, user_id=user_id).first()
+    if not folder:
+        return jsonify(error="Folder not found"), 404
+    db.session.delete(folder)
+    db.session.commit()
+    return jsonify(message="Folder permanently deleted"), 200
+
+
 #GET /api/trash/folders
 #GET /api/trash/files
 #PUT /api/trash/restore/folder/<folder_id>
