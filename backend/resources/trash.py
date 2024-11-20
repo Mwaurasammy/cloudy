@@ -28,12 +28,32 @@ def list_trashed_files():
 @jwt_required()
 def restore_folder(folder_id):
     user_id = get_jwt_identity()
-    folder = Folder.query.filter_by(id=folder_id, user_id=user_id, deleted_at__isnot=None).first()
-    if not folder:
-        return jsonify(error="Folder not found or not in trash"), 404
-    folder.deleted_at = None
-    db.session.commit()
-    return jsonify(message="Folder restored", folder_id=folder.id), 200
+    print(f"Decoded user ID: {user_id}")
+    try:
+        # Fetch the folder from the database
+        folder = Folder.query.filter(
+            Folder.id == folder_id,
+            Folder.user_id == user_id,
+            Folder.deleted_at.isnot(None)
+        ).first()
+        
+        # If folder does not exist or is not in trash
+        if not folder:
+            return jsonify(error="Folder not found or not in trash"), 404
+
+        # Restore the folder
+        folder.deleted_at = None
+        db.session.commit()
+        return jsonify(message="Folder restored", folder_id=folder.id), 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print(f"Database error: {str(e)}")
+        return jsonify(error="Database operation failed"), 500
+
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return jsonify(error="An unexpected error occurred"), 500
 
 # Endpoint 4: Restore a file from trash
 @trash_bp.route('/restore/file/<int:file_id>', methods=['PUT'])
