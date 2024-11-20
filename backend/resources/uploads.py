@@ -1,36 +1,59 @@
 from flask import Blueprint, request, jsonify
-from models import db, Upload
-# from utils import upload_file
-from config import Config
-from supabase_client import upload_file_to_storage 
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from models import db, Upload, User  # Ensure User is imported to validate user_id
+from supabase_client import upload_file_to_storage  # Your custom Supabase client
 
 # Create a Blueprint for upload-related routes
 upload_bp = Blueprint('upload_bp', __name__)
 
+# Route to upload a file
 @upload_bp.route('/upload_file', methods=['POST'])
+@jwt_required()  # Ensure the user is authenticated with a valid JWT
 def upload_file_route():
-    data = request.files
-    file = data.get('file')  # Fetch the file from the form data
-    
-    # Check if the file exists in the request
+    # Extract the user_id from the JWT token
+    user_id = get_jwt_identity()
+
+    # Check if the file is part of the request
+    file = request.files.get('file')
     if not file:
         return jsonify({"error": "File is required"}), 400
 
-    # If the file exists, proceed with creating the file path
+    # Get file details
     file_name = file.filename
     file_content = file.read()
 
-    # Upload to Supabase
-    upload_response = upload_file_to_storage(file_name, file_content)  # Call the function from supabaseclient.py
-
+    # Upload the file to Supabase (ensure upload_file_to_storage handles file storage)
+    upload_response = upload_file_to_storage(file_name, file_content, user_id)
+    print(upload_response)
+    
     if not upload_response:
         return jsonify({"error": "Failed to upload file"}), 500
 
-    # Optionally, save metadata to the database here if needed (you already have a save_metadata route for that)
-    file_metadata = upload_response
-    return jsonify(file_metadata), 200  # Return file metadata on success
+    # Assuming upload_response contains a file_path or URL for the uploaded file
+    file_path = upload_response.get('file_path')  # Adjust based on actual response
 
-# Route to save file metadata to the database
+    # Save the file metadata to the database
+    try:
+        new_upload = Upload(file_name=file_name, user_id=user_id, file_path=file_path)
+        db.session.add(new_upload)
+        db.session.commit()
+        
+        db.session.refresh(new_upload)
+        
+        file_metadata = {
+            "file_name": file_name,
+            "user_id": user_id,
+            "file_path": file_path,  # Include the file path from Supabase
+            "storage_response": upload_response
+        }
+
+        return jsonify(file_metadata), 200  # Return file metadata on success
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Failed to save metadata: {str(e)}"}), 500
+
+# Route to save file metadata to the database (if needed)
 @upload_bp.route('/save_metadata', methods=['POST'])
 def save_metadata():
     data = request.json
@@ -39,8 +62,11 @@ def save_metadata():
     file_name = data.get('file_name')
     user_id = data.get('user_id')
 
+    # Validate inputs
     if not file_name or not user_id:
         return jsonify({"error": "File name and user ID are required"}), 400
+    if not User.query.get(user_id):  # Validate that the user exists
+        return jsonify({"error": "Invalid user ID"}), 400
 
     # Create a new Upload instance
     new_upload = Upload(file_name=file_name, user_id=user_id)
@@ -55,6 +81,7 @@ def save_metadata():
         db.session.rollback()
         return jsonify({"error": f"Failed to save metadata: {str(e)}"}), 500
 
+# Add CORS headers to support cross-origin requests
 @upload_bp.after_request
 def add_cors_headers(response):
     response.headers.add('Access-Control-Allow-Origin', '*')

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, session
 from models import db, User
-from flask_jwt_extended import create_access_token, JWTManager
+from flask_jwt_extended import create_access_token, JWTManager, jwt_required, get_jwt_identity
 from sqlalchemy.exc import IntegrityError
 
 auth_bp = Blueprint('auth', __name__)
@@ -45,3 +45,16 @@ def login():
 def logout():
     session.clear()
     return jsonify(message="Successfully logged out"), 200
+
+# Example of a protected route where we use the user_id extracted from the JWT
+@auth_bp.route('/profile', methods=['GET'])
+@jwt_required()  # This ensures the user is authenticated
+def profile():
+    # Extract the user_id from the JWT token
+    user_id = get_jwt_identity()
+    
+    # Query the user from the database
+    user = User.query.get(user_id)
+    if user:
+        return jsonify(username=user.username, email=user.email), 200
+    return jsonify(error="User not found"), 404
