@@ -13,8 +13,10 @@ def upload_file_route():
     # Extract the user_id from the JWT token
     user_id = get_jwt_identity()
 
-    # Check if the file is part of the request
-    file = request.files.get('file')
+    data = request.files
+    file = data.get('file')  # Fetch the file from the form data
+    
+    # Check if the file exists in the request
     if not file:
         return jsonify({"error": "File is required"}), 400
 
@@ -29,29 +31,9 @@ def upload_file_route():
     if not upload_response:
         return jsonify({"error": "Failed to upload file"}), 500
 
-    # Assuming upload_response contains a file_path or URL for the uploaded file
-    file_path = upload_response.get('file_path')  # Adjust based on actual response
-
-    # Save the file metadata to the database
-    try:
-        new_upload = Upload(file_name=file_name, user_id=user_id, file_path=file_path)
-        db.session.add(new_upload)
-        db.session.commit()
-        
-        db.session.refresh(new_upload)
-        
-        file_metadata = {
-            "file_name": file_name,
-            "user_id": user_id,
-            "file_path": file_path,  # Include the file path from Supabase
-            "storage_response": upload_response
-        }
-
-        return jsonify(file_metadata), 200  # Return file metadata on success
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": f"Failed to save metadata: {str(e)}"}), 500
+    # Optionally, save metadata to the database here if needed (you already have a save_metadata route for that)
+    file_metadata = upload_response
+    return jsonify(file_metadata), 200  # Return file metadata on success
 
 # Route to save file metadata to the database (if needed)
 @upload_bp.route('/save_metadata', methods=['POST'])

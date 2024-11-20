@@ -34,49 +34,48 @@ ALLOWED_MIME_TYPES = [
 # 1. Upload a file to Supabase storage
 def upload_file_to_storage(file_name, file_content, user_id):
     try:
-        # Validate MIME type
+        storage = supabase.storage
+        
+        # Guess MIME type of the file
         mime_type, _ = mimetypes.guess_type(file_name)
         if mime_type not in ALLOWED_MIME_TYPES:
-            logging.error(f"File {file_name} has an invalid MIME type: {mime_type}")
-            return {"error": "Invalid file type. Upload a valid file."}, 400
+            logging.error(f"Invalid MIME type: {mime_type}")
+            return {"error": "Invalid file type"}, 400
         
-        # Access the storage directly from the Supabase client
-        storage = supabase.storage
-        file_path = os.path.join('files', file_name)  # Save the file under 'files/' in your bucket
-        
-        # Check for duplicate files using 'list' method
-        file_list = storage.from_(bucket_name).list('files', {'prefix': file_name})
+        # Check if the file already exists in the storage
+        file_path = os.path.join('files', file_name)
+        file_list = supabase.storage.from_(bucket_name).list('files', {'prefix': file_name})
         if file_list and any(f['name'] == file_name for f in file_list):
-            logging.warning(f"File {file_name} already exists.")
-            return {"error": "File with the same name already exists"}, 409
+            logging.warning(f"File {file_name} already exists")
+            return {"error": "File already exists"}, 409
 
-        # Upload the file
+        # Upload file to Supabase storage
         response = storage.from_(bucket_name).upload(file_path, file_content, {"content-type": mime_type})
+        
+        # Check if the response has an error
+        if hasattr(response, 'error') and response.error:
+            logging.error(f"Error uploading file {file_name}: {response.error['message']}")
+            return {"error": "Storage upload failed"}, 500
 
-        # Check if the response has an error attribute or the upload failed
-        if response.get('error'):
-            logging.error(f"Error uploading file {file_name}: {response['error']['message']}")
-            return {"error": "Failed to upload file to storage"}, 500
-
-        # Ensure the app context is active when performing DB operations
+        # Save metadata to the database
         with app.app_context():
-            # Save metadata to the database, including user_id
-            new_file = File(
-                name=file_name,
-                storage_path=file_path,  # No 'content' field, only the path
-                user_id=user_id  # Ensure the user_id is saved
-            )
+            new_file = File(name=file_name, storage_path=file_path, user_id=user_id)
             db.session.add(new_file)
             db.session.commit()
+            db.session.refresh(new_file)
 
         logging.info(f"File {file_name} uploaded to Supabase Storage successfully.")
-        return new_file.to_dict()
-
+        return {
+            "file_path": file_path,
+            "message": "File uploaded successfully",
+            "data": new_file.to_dict()
+        }
+    
     except Exception as e:
-        logging.error(f"Upload failed: {e}")
+        logging.error(f"Error during file upload: {e}")
         logging.error(traceback.format_exc())
-        return {"error": f"Failed to upload file due to an internal error: {str(e)}"}, 500
-
+        return {"error": "Internal server error"}, 500
+    
 # 2. Upload a folder to Supabase storage
 def upload_folder_to_storage(folder_name, folder_path, user_id):
     try:
