@@ -66,8 +66,10 @@ def save_metadata():
 # Add CORS headers to support cross-origin requests
 @upload_bp.after_request
 def add_cors_headers(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    origin = request.headers.get('Origin', '*')  # Dynamically get the client's origin
+    response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
+
