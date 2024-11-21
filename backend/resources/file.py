@@ -65,20 +65,25 @@ def update_file_name(file_id):
 @jwt_required()
 def delete_file(file_id):
     user_id = get_jwt_identity()
+
+    # Find the file in the database
     file = File.query.filter_by(id=file_id, user_id=user_id, deleted_at=None).first()
 
     if not file:
-        return jsonify(error="File not found or access denied"), 404
+        return jsonify({"error": "File not found or access denied"}), 404
 
+    # Soft delete the file by marking it in the database
     file.deleted_at = datetime.utcnow()
     db.session.commit()
 
+    # Delete the file from Supabase storage
     try:
         delete_file_from_storage(file.name)
     except Exception as e:
         return jsonify(error="Failed to delete file from storage", details=str(e)), 500
 
     return jsonify(message="File moved to trash"), 200
+
 
 # 4. Move file into another folder
 @file_bp.route('/move/<int:file_id>', methods=['PUT'])
