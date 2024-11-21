@@ -24,12 +24,22 @@ def list_recent_files():
 def list_recent_folders():
     user_id = get_jwt_identity()
 
-    # Get all folders for the user ordered by the last_accessed field (descending)
-    recent_folders = Folder.query.filter_by(user_id=user_id).order_by(Folder.last_accessed.desc()).limit(10).all()
+    # Get all non-deleted folders for the user, ordered by last_accessed (descending)
+    recent_folders = (
+        Folder.query.filter(
+            Folder.user_id == user_id,
+            Folder.deleted_at.is_(None)  # Filter out deleted folders
+        )
+        .order_by(Folder.last_accessed.desc())
+        .limit(10)
+        .all()
+    )
 
+    # Serialize folder information to a list of dictionaries
     folders_info = [folder.to_dict() for folder in recent_folders]
 
     return jsonify(recent_folders=folders_info), 200
+
 
 # 3. Update the last accessed timestamp for a file
 @recents_bp.route('/file/<int:file_id>/accessed', methods=['PUT'])
