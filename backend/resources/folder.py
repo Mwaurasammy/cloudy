@@ -13,21 +13,40 @@ def create_folder():
     user_id = get_jwt_identity()
     data = request.get_json()
 
-    # Check if the folder name is provided
-    if 'name' not in data:
-        return jsonify(error="Folder name is required"), 400
+    # Validate input data
+    if not data or 'name' not in data or not data['name'].strip():
+        return jsonify(error="Folder name is required and cannot be empty"), 400
 
-    folder_name = data['name']
+    folder_name = data['name'].strip()
 
-    # Create a new folder in the database
-    folder = Folder(name=folder_name, user_id=user_id)
-    db.session.add(folder)
-    db.session.commit()
+    try:
+        # Check for duplicate folder name for the user
+        existing_folder = Folder.query.filter_by(name=folder_name, user_id=user_id).first()
+        if existing_folder:
+            return jsonify(error="Folder with the same name already exists"), 409
 
-    # Optionally, upload folder to Supabase storage (if required)
-    upload_folder_to_storage(folder_name, 'path/to/folder')
+        # Create the folder in the database
+        folder = Folder(name=folder_name, user_id=user_id)
+        db.session.add(folder)
+        db.session.commit()
 
-    return jsonify(message="Folder created", folder_id=folder.id), 201
+        # Optionally, upload folder to Supabase storage
+        try:
+            upload_folder_to_storage(folder_name, f'path/to/folder/{user_id}')
+        except Exception as e:
+            app.logger.error(f"Supabase upload failed: {str(e)}")
+            # Optionally, decide whether to rollback the database folder creation
+            db.session.delete(folder)
+            db.session.commit()
+            return jsonify(error="Failed to upload folder to storage"), 500
+
+        return jsonify(message="Folder created successfully", folder_id=folder.id), 201
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error creating folder: {str(e)}")
+        return jsonify(error="An unexpected error occurred"), 500
+
 
 # 2. Rename an existing folder
 @folder_bp.route('/update_name/<int:folder_id>', methods=['PUT'])
