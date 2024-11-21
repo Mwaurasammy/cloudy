@@ -98,6 +98,29 @@ def delete_folder_permanently(folder_id):
     db.session.commit()
     return jsonify(message="Folder permanently deleted"), 200
 
+@trash_bp.route('/file/<int:file_id>', methods=['DELETE'])
+@jwt_required()
+def delete_file_permanently(file_id):
+    user_id = get_jwt_identity()
+    file = File.query.filter_by(id=file_id, user_id=user_id).first()
+    
+    if not file:
+        return jsonify(error="File not found"), 404
+    
+    # Assuming file has an associated file path or filename for actual deletion
+    try:
+        # Assuming you're using a file storage solution (e.g., Supabase, AWS S3, local filesystem)
+        # This step may vary based on your storage system
+        storage.delete(file.file_path)  # Replace `storage.delete` with your actual delete method
+    
+    except Exception as e:
+        return jsonify(error=f"Failed to delete the file: {str(e)}"), 500
+
+    db.session.delete(file)
+    db.session.commit()
+    
+    return jsonify(message="File permanently deleted"), 200
+    
 
 #GET /api/trash/folders
 #GET /api/trash/files
