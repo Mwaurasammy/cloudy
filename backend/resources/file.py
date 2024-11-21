@@ -144,3 +144,19 @@ def get_all_files():
     file_list = [file.to_dict() for file in files]
 
     return jsonify(files=file_list), 200
+
+@file_bp.route('/folder_files/<int:folder_id>', methods=['GET'])
+@jwt_required()
+def get_files_by_folder_id(folder_id):
+    user_id = get_jwt_identity()
+
+    # Query the database for files in the specified folder
+    files = File.query.filter_by(folder_id=folder_id, user_id=user_id, deleted_at=None).all()
+
+    if not files:
+        return jsonify({"error": "No files found for the specified folder_id or access denied"}), 404
+
+    # Convert the file objects to dictionaries
+    file_data = [file.to_dict() for file in files]
+
+    return jsonify(files=file_data), 200
